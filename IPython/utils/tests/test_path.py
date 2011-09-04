@@ -419,6 +419,30 @@ def test_unquote_filename():
     nt.assert_equals(path.unquote_filename("'foo.py'", win32=False), "'foo.py'")
     nt.assert_equals(path.unquote_filename("'foo bar.py'", win32=False), "'foo bar.py'")
 
+def test_quote_filename():
+    def exercise_one_name(exists):
+        for win32 in (True, False):
+            for only_if_exists in (True, False):
+                for prequote in ('"', ''):
+                    name2 = prequote + name + prequote
+                    result = path.quote_filename(name2, 
+                                                 only_if_exists=only_if_exists,
+                                                 win32=win32)
+                    if (quotable and win32 and prequote == '' and
+                        (exists or not only_if_exists)
+                       ):
+                        nt.assert_equals(result, '"%s"' % name2)
+                    else:
+                        nt.assert_equals(result, name2)
+        
+    for (name, quotable) in [('foo.tmp', False), ('foo bar.tmp', True)]:
+        with make_tempfile(name):        
+            exercise_one_name(exists=True)
+    name = '!^%$^%$'
+    quotable = False
+    exercise_one_name(exists=False)
+    
+    
 @with_environment
 def test_get_py_filename():
     os.chdir(TMP_TEST_DIR)

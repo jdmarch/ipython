@@ -90,6 +90,20 @@ def unquote_filename(name, win32=(sys.platform=='win32')):
             name = name[1:-1]
     return name
 
+def quote_filename(name, only_if_exists=True, win32=(sys.platform=='win32')):
+    """ On Windows, enclose name in quotes if it contains spaces and is not
+    already quoted. 
+    
+    If only_if_exists (default), then only quote name if it is the name of an 
+    existing file. This can be used to quote only existing filenames in a list
+    of command line arguments.
+    """
+    if win32:
+        if ' ' in name and name[0] != '"' and (not only_if_exists 
+                                               or os.path.isfile(name)):
+            name = '"%s"' % name
+    return name
+
 
 def get_py_filename(name, force_win32=None):
     """Return a valid python filename in the current directory.

@@ -48,6 +48,7 @@ from IPython.config.loader import Config
 from IPython.utils.process import find_cmd, getoutputerror
 from IPython.utils.text import list_strings
 from IPython.utils.io import temp_pyfile
+from IPython.utils.path import quote_filename
 
 from . import decorators as dec
 from . import skipdoctest
@@ -209,9 +210,9 @@ def ipexec(fname, options=None):
     _ip = get_ipython()
     test_dir = os.path.dirname(__file__)
 
-    ipython_cmd = find_cmd('ipython')
+    ipython_cmd = quote_filename(find_cmd('ipython'))
     # Absolute path for filename
-    full_fname = os.path.join(test_dir, fname)
+    full_fname = quote_filename(os.path.join(test_dir, fname))
     full_cmd = '%s %s %s' % (ipython_cmd, cmdargs, full_fname)
     #print >> sys.stderr, 'FULL CMD:', full_cmd # dbg
     out = getoutputerror(full_cmd)

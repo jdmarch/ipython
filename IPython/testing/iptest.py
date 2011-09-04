@@ -45,7 +45,7 @@ import nose.plugins.builtin
 from nose.core import TestProgram
 
 # Our own imports
-from IPython.utils.path import get_ipython_module_path
+from IPython.utils.path import get_ipython_module_path, quote_filename
 from IPython.utils.process import find_cmd, pycmd2argv
 from IPython.utils.sysinfo import sys_info
 
@@ -256,9 +256,7 @@ class IPTester(object):
             # What types of problems are you having. They may be related to
             # running Python in unboffered mode. BG.
             for ndx, arg in enumerate(self.call_args):
-                # Enclose in quotes if necessary and legal
-                if ' ' in arg and os.path.isfile(arg) and arg[0] != '"':
-                    self.call_args[ndx] = '"%s"' % arg
+                self.call_args[ndx] = quote_filename(arg)
             return os.system(' '.join(self.call_args))
     else:
         def _run_cmd(self):
