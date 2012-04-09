@@ -38,7 +38,7 @@ CSI_SUBPATTERN = '\[(.*?)([%s])' % CSI_COMMANDS
 OSC_SUBPATTERN = '\](.*?)[\x07\x1b]'
 ANSI_PATTERN = ('\x01?\x1b(%s|%s)\x02?' % \
                 (CSI_SUBPATTERN, OSC_SUBPATTERN))
-ANSI_OR_SPECIAL_PATTERN = re.compile('(\b|\r(?!\n))|(?:%s)' % ANSI_PATTERN)
+ANSI_OR_SPECIAL_PATTERN = re.compile('(\a|\b|\r(?!\n))|(?:%s)' % ANSI_PATTERN)
 SPECIAL_PATTERN = re.compile('([\f])')
 
 #-----------------------------------------------------------------------------
@@ -86,16 +86,29 @@ class AnsiCodeProcessor(object):
         for match in ANSI_OR_SPECIAL_PATTERN.finditer(string):
             raw = string[start:match.start()]
             substring = SPECIAL_PATTERN.sub(self._replace_special, raw)
+            groups = filter(lambda x: x is not None, match.groups())
+
+            #FIXME: I think this code can be cleaned up but I didn't want to
+            #take the time for that until the logic was clear:
+            if groups[0] == '\b':
+                if len(substring) > 1:
+                    substring = substring[:-1]
+                    yield substring
+                start = match.end()
+                continue
+
+            # FIXME: It looks to me as if this code fails to reset self.actions
+            # appropriately, not caught by weak unit tests.
+
             if substring or self.actions:
                 yield substring
             start = match.end()
 
             self.actions = []
-            groups = filter(lambda x: x is not None, match.groups())
             if groups[0] == '\r':
                 self.actions.append(CarriageReturnAction('carriage-return'))
                 yield ''
-            elif groups[0] == '\b':
+            elif groups[0] == '\a':
                 self.actions.append(BeepAction('beep'))
                 yield ''
             else:
@@ -113,6 +126,7 @@ class AnsiCodeProcessor(object):
                 elif groups[0].startswith(']'):
                     # Case 2: OSC code.
                     self.set_osc_code(params)
+                    
 
         raw = string[start:]
         substring = SPECIAL_PATTERN.sub(self._replace_special, raw)

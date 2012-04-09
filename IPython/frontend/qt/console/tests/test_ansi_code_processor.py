@@ -106,10 +106,19 @@ class TestAnsiCodeProcessor(unittest.TestCase):
         """ Are carriage return characters processed correctly?
         """
         string = 'foo\rbar' # carriage return
-        self.assertEquals(list(self.processor.split_string(string)), ['foo', '', 'bar'])
-        self.assertEquals(len(self.processor.actions), 1)
-        action = self.processor.actions[0]
-        self.assertEquals(action.action, 'carriage-return')
+        # FIXME: this strengthened test breaks because the CR action is not reset.
+        splits = []
+        actions = []
+        for split in self.processor.split_string(string):
+            splits.append(split)
+            actions.append([action.action for action in self.processor.actions])
+        self.assertEquals(splits, ['foo', '', 'bar'])
+        self.assertEquals(actions, [[], ['carriage-return'], []])
+        
+        #self.assertEquals(list(self.processor.split_string(string)), ['foo', '', 'bar'])
+        #self.assertEquals(len(self.processor.actions), 1)
+        #action = self.processor.actions[0]
+        #self.assertEquals(action.action, 'carriage-return')
 
     def test_carriage_return_newline(self):
         """transform CRLF to LF"""
@@ -123,11 +132,31 @@ class TestAnsiCodeProcessor(unittest.TestCase):
     def test_beep(self):
         """ Are beep characters processed correctly?
         """
-        string = 'foo\bbar' # form feed
+        string = 'foo\abar' # bell
         self.assertEquals(list(self.processor.split_string(string)), ['foo', '', 'bar'])
         self.assertEquals(len(self.processor.actions), 1)
         action = self.processor.actions[0]
         self.assertEquals(action.action, 'beep')
+
+    def test_backspace(self):
+        """ Are backspace characters processed correctly?
+        """
+        string = 'foo\bbar' # backspace
+        self.assertEquals(list(self.processor.split_string(string)), ['fo', 'bar'])
+        self.assertEquals(self.processor.actions, [])
+
+    def test_combined(self):
+        """ Are return and backspace characters processed correctly in combination?
+        """
+        # FIXME: this breaks because the CR action is not reset.
+        string = 'abc\rdef\b' # CR and backspace
+        splits = []
+        actions = []
+        for split in self.processor.split_string(string):
+            splits.append(split)
+            actions.append([action.action for action in self.processor.actions])
+        self.assertEquals(splits, ['abc', '', 'de', ''])
+        self.assertEquals(actions, [[], ['carriage-return'], [], []])
 
 
 if __name__ == '__main__':
