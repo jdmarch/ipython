@@ -29,8 +29,14 @@ ScrollAction = namedtuple('ScrollAction', ['action', 'dir', 'unit', 'count'])
 # An action for the carriage return character
 CarriageReturnAction = namedtuple('CarriageReturnAction', ['action'])
 
+# An action for the \n character
+NewLineAction = namedtuple('NewLineAction', ['action'])
+
 # An action for the beep character
 BeepAction = namedtuple('BeepAction', ['action'])
+
+# An action for backspace
+BackSpaceAction = namedtuple('BackSpaceAction', ['action'])
 
 # Regular expressions.
 CSI_COMMANDS = 'ABCDEFGHJKSTfmnsu'
@@ -38,7 +44,7 @@ CSI_SUBPATTERN = '\[(.*?)([%s])' % CSI_COMMANDS
 OSC_SUBPATTERN = '\](.*?)[\x07\x1b]'
 ANSI_PATTERN = ('\x01?\x1b(%s|%s)\x02?' % \
                 (CSI_SUBPATTERN, OSC_SUBPATTERN))
-ANSI_OR_SPECIAL_PATTERN = re.compile('(\b|\r(?!\n))|(?:%s)' % ANSI_PATTERN)
+ANSI_OR_SPECIAL_PATTERN = re.compile('(\a|\b|\r(?!\n)|\r?\n)|(?:%s)' % ANSI_PATTERN)
 SPECIAL_PATTERN = re.compile('([\f])')
 
 #-----------------------------------------------------------------------------
@@ -83,21 +89,37 @@ class AnsiCodeProcessor(object):
         self.actions = []
         start = 0
 
+        # strings ending with \r are assumed to be ending in \r\n since
+        # \n is appended to output strings automatically.  Accounting
+        # for that, here.
+        last_char = '\n' if len(string) > 0 and string[-1] == '\n' else None
+        string = string[:-1] if last_char is not None else string
+
         for match in ANSI_OR_SPECIAL_PATTERN.finditer(string):
             raw = string[start:match.start()]
             substring = SPECIAL_PATTERN.sub(self._replace_special, raw)
             if substring or self.actions:
                 yield substring
+                self.actions = []
             start = match.end()
 
-            self.actions = []
             groups = filter(lambda x: x is not None, match.groups())
-            if groups[0] == '\r':
-                self.actions.append(CarriageReturnAction('carriage-return'))
-                yield ''
-            elif groups[0] == '\b':
+            if groups[0] == '\a':
                 self.actions.append(BeepAction('beep'))
-                yield ''
+                yield None
+                self.actions = []
+            elif groups[0] == '\r':
+                self.actions.append(CarriageReturnAction('carriage-return'))
+                yield None
+                self.actions = []
+            elif groups[0] == '\b':
+                self.actions.append(BackSpaceAction('backspace'))
+                yield None
+                self.actions = []
+            elif groups[0] == '\n' or groups[0] == '\r\n':
+                self.actions.append(NewLineAction('newline'))
+                yield groups[0]
+                self.actions = []
             else:
                 params = [ param for param in groups[1].split(';') if param ]
                 if groups[0].startswith('['):
@@ -118,6 +140,10 @@ class AnsiCodeProcessor(object):
         substring = SPECIAL_PATTERN.sub(self._replace_special, raw)
         if substring or self.actions:
             yield substring
+
+        if last_char is not None:
+            self.actions.append(NewLineAction('newline'))
+            yield last_char
 
     def set_csi_code(self, command, params=[]):
         """ Set attributes based on CSI (Control Sequence Introducer) code.
